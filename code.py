@@ -32,24 +32,33 @@ def on_enter():
     lcd.set_cursor_pos(1, 0)
     lcd.print("SENT")
     time.sleep(.5)
+
 def on_backspace():
-    global msg
-    msg = msg[0:-1]
+    global msg, cursor_pos
+    if cursor_pos > 0:
+        msg = msg[0:cursor_pos -1] + msg[cursor_pos:]
+        cursor_pos -= 1
+
 def on_tab():
     pass
+
 def on_escape():
     global msg
     msg = ""
+    cursor_pos = 0
+
 def on_up():
     pass
+
 def on_down():
     pass
 def on_left():
     global cursor_pos
-    cursor_pos -= 1
+    cursor_pos = max(0, cursor_pos - 1)
+
 def on_right():
     global cursor_pos
-    cursor_pos += 1
+    cursor_pos = min(len(msg), cursor_pos + 1)
 
 SPECIAL = { #special key handler dict
     m5.Keyboard.ENTER: on_enter,
