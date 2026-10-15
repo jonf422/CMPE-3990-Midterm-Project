@@ -43,7 +43,7 @@ def on_tab():
     pass
 
 def on_escape():
-    global msg
+    global msg, cursor_pos
     msg = ""
     cursor_pos = 0
 
