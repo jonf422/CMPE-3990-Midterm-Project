@@ -33,6 +33,7 @@ class Keyboard:
         if self._buf[0] != 0:
             return self._buf[0]
 
+'''
 # ----------- INIT ------------------ #
 i2c = busio.I2C(PIN_SCL, PIN_SDA)
 kb = Keyboard(i2c)
@@ -43,3 +44,4 @@ while 1:
     if key != None:
         print("Key pressed (hex): ", hex(key))
         print("Key pressed (char): ", chr(key))
+'''
