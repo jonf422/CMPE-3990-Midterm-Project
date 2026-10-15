@@ -22,7 +22,7 @@ class Keyboard:
         if self._addr not in found:
             raise RuntimeError(f"CARD KB not found at {self._addr}. Bus has {found}")
 
-    def read_key(self):
+    def read_key(self) -> hex:
         while not self._i2c.try_lock():
             pass
         try:
@@ -31,17 +31,4 @@ class Keyboard:
             self._i2c.unlock()
 
         if self._buf[0] != 0:
-            return self._buf[0]
-
-'''
-# ----------- INIT ------------------ #
-i2c = busio.I2C(PIN_SCL, PIN_SDA)
-kb = Keyboard(i2c)
-
-# ------------ LOOP ----------------- #
-while 1:
-    key = kb.read_key()
-    if key != None:
-        print("Key pressed (hex): ", hex(key))
-        print("Key pressed (char): ", chr(key))
-'''
+            return hex(self._buf[0])
