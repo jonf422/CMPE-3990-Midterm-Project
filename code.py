@@ -154,12 +154,17 @@ def send_right():
     global cursor_pos
     cursor_pos = min(len(send_msg), cursor_pos + 1)
 
-def tab():
+def tab(): ###### CHANGES DEVICE STATE SEND OR RECEIVE#################
     next_state = not state
     change_state(next_state)
 
 
 ############ SPECIAL KEY HANDLER
+'''
+KEY: VALUE => M5 KB Special Key: Special Key Handler Function
+
+On index of special key, calls appropriate key handler function per device state
+'''
 SPECIAL = { #special key handler dict
     SENDING: {
         m5.Keyboard.ENTER: send_enter,
@@ -178,10 +183,9 @@ SPECIAL = { #special key handler dict
 }
 
 
-# ------------- INIT ------------------- #
+# ------------- INITS ------------------- #
 i2c = busio.I2C(scl=SCL, sda=SDA) #init I2C bus
 while not i2c.try_lock(): pass
-
 #check address list is valid
 try:
     address = i2c.scan()
@@ -196,6 +200,7 @@ try:
 finally:
     i2c.unlock()
 
+
 kb = m5.Keyboard(i2c) #init keyboard from class
 lcd = LCD(I2CPCF8574Interface(i2c, LCD_ADDR), num_rows=2, num_cols=lcd_cols) #init lcd using libraries
 lcd.set_cursor_mode(CursorMode.LINE) #set cursor mode
@@ -203,16 +208,19 @@ lcd.clear()
 
 # ------------- LOOP ------------------- #
 while 1:
-    radio_receive()
-    key = kb.read_key()
+    radio_receive() #poll message receive function
+    key = kb.read_key() #poll key press receive function
     if key is not None:
-        handlers = SPECIAL[state]
-        if key in handlers:
-            handlers[key]()
-        elif state == SENDING and 32 <= key <= 126:  # Printable ASCII range
-            send_msg = send_msg[:cursor_pos] + chr(key) + send_msg[cursor_pos:]
-            cursor_pos += 1
         dirty = True
+        #check if key press was special key with function in current device state
+        handlers = SPECIAL[state]
+        if key in handlers: 
+            handlers[key]() #call special key function
+
+        #check if key press is keycode in ASCII range
+        elif state == SENDING and 32 <= key <= 126:
+            send_msg = send_msg[:cursor_pos] + chr(key) + send_msg[cursor_pos:] #add character to sending message
+            cursor_pos += 1
 
     if dirty: #redraw screen
         redraw()
