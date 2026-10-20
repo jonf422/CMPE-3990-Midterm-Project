@@ -1,10 +1,13 @@
 import board
 import busio
 import time
+import digitalio
+
 
 from lcd_circuitpy.lcd import LCD
 from lcd_circuitpy.i2c_pcf8574_interface import I2CPCF8574Interface
 from lcd_circuitpy.lcd import CursorMode
+from circuitpython_nrf24l01.rf24_lite import RF24
 
 import m5_micro_keyboard as m5
 
@@ -20,6 +23,8 @@ new_msg_flag = 0
 status = ""
 dirty = True
 lcd_cols = 16
+RADIO_ID = 0        # set to 1 on the other pager
+ADDRESSES = (b"PGR0", b"PGR1")
 
 ### FOR TESTINGG ##################
 last_recv_time = time.monotonic()
@@ -75,18 +80,38 @@ def change_state(next_state):
 # ------------- Radio functions -------------------------- #
 #TODO: radio send and receive
 def radio_send(msg):
-    print(f"Sent: {msg}")
+    nrf.listen = False                       # switch to transmit
+    ok = nrf.send(msg.encode("utf-8")[:32])  # 32-byte max payload
+    nrf.listen = True                        # back to receive
+    print(f"send '{msg}': {'OK' if ok else 'FAILED'}")
+    return ok
 
 def radio_receive():
-    global recv_msg, new_msg_flag, last_recv_time, dirty, test_index
-    if time.monotonic() - last_recv_time > 30: #send test msg every 30s
-        recv_msg = f"test{test_index}"
-        test_index += 1
+    if nrf.available():
+        data = nrf.read()
+        if data:
+            try:
+                return bytes(data).decode("utf-8").rstrip("\x00")
+            except UnicodeError:
+                return None
+    return None
 
-        if state == SENDING: #enable msg flag
-            new_msg_flag = 1
-        last_recv_time = time.monotonic()
-        dirty = True
+def recv_handle(msg):
+    '''
+    Stores a received message and marks the display dirty.
+
+    Parameters:
+    - msg: received message string
+
+    SENDING: increments new message flag (doesn't interrupt typing)
+    RECEIVING: message displays immediately on redraw
+    '''
+    global recv_msg, new_msg_flag, dirty
+
+    recv_msg = msg
+    if state == SENDING:
+        new_msg_flag += 1
+    dirty = True
 ################################################################
 
 
@@ -119,11 +144,10 @@ def redraw():
 def send_enter():
     global send_msg, cursor_pos
     if send_msg:
-        #TODO: radio.send()
-        radio_send(send_msg)
+        ok = radio_send(send_msg)
         send_msg, cursor_pos = "", 0
         lcd.set_cursor_pos(1, 0)
-        lcd.print("SENT")
+        lcd.print("SENT" if ok else "FAIL")
         time.sleep(.5)
     else:
         change_state(RECEIVING)
@@ -206,9 +230,22 @@ lcd = LCD(I2CPCF8574Interface(i2c, LCD_ADDR), num_rows=2, num_cols=lcd_cols) #in
 lcd.set_cursor_mode(CursorMode.LINE) #set cursor mode
 lcd.clear()
 
+#radio init
+spi = busio.SPI(board.A5, MOSI=board.A7, MISO=board.A6)
+csn = digitalio.DigitalInOut(board.A4)
+ce = digitalio.DigitalInOut(board.B0)
+nrf = RF24(spi, csn, ce)
+nrf.pa_level = -12                  # low power for bench testing; raise later
+nrf.open_tx_pipe(ADDRESSES[1 - RADIO_ID])     # send to the other pager
+nrf.open_rx_pipe(1, ADDRESSES[RADIO_ID])      # listen on my own address
+nrf.listen = True                   # default to receive mode
+
 # ------------- LOOP ------------------- #
 while 1:
-    radio_receive() #poll message receive function
+    msg = radio_receive() #poll message receive function
+    if msg is not None:
+        recv_handle(msg)
+
     key = kb.read_key() #poll key press receive function
     if key is not None:
         dirty = True

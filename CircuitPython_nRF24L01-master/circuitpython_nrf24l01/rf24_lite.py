@@ -35,7 +35,7 @@ class RF24:
         with self._spi as spi:
             spi.write_readinto(out_buf, in_buf)
         self._status = in_buf[0]
-        return in_buf[1]
+        return in_buf[-1]
 
     def _reg_read_bytes(self, reg, buf_len=5):
         in_buf = bytearray(buf_len + 1)
