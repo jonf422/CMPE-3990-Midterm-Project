@@ -1,4 +1,3 @@
-# FINALLY GOT THIS FUCKER TO WORK HOLY SHIT
 # Requires CircuitPython_LCD-main library
 
 import board
