@@ -23,13 +23,9 @@ new_msg_flag = 0
 status = ""
 dirty = True
 lcd_cols = 16
-RADIO_ID = 0        # set to 1 on the other pager
-ADDRESSES = (b"PGR0", b"PGR1")
+RADIO_ID = 0
+ADDRESSES = (b"PGR00", b"PGR01")
 
-### FOR TESTINGG ##################
-last_recv_time = time.monotonic()
-test_index = 0
-###############################
 
 #i2c pins
 SCL = board.B6
@@ -38,6 +34,10 @@ SDA = board.B7
 #i2c device addrs
 LCD_ADDR = 0x27
 KB_ADDR = 0x5f
+
+#####################################
+#       FUNCTION DEFS
+######################################    
 
 # ------------ State Machine Functions ------------------- #
 def set_status():
@@ -76,7 +76,7 @@ def change_state(next_state):
         lcd.set_cursor_mode(CursorMode.HIDE) 
     dirty = True
 
-#############################################################
+
 # ------------- Radio functions -------------------------- #
 #TODO: radio send and receive
 def radio_send(msg):
@@ -112,7 +112,6 @@ def recv_handle(msg):
     if state == SENDING:
         new_msg_flag += 1
     dirty = True
-################################################################
 
 
 # ------------- LCD functions -------------------------- #
@@ -142,6 +141,11 @@ def redraw():
 # ------------ Special key handler functions -------------- #
 #######  SENDING
 def send_enter():
+    '''
+    handler for enter key in SENDING
+
+    if a message has been typed, the handler will transmit the message
+    '''
     global send_msg, cursor_pos
     if send_msg:
         ok = radio_send(send_msg)
@@ -149,10 +153,13 @@ def send_enter():
         lcd.set_cursor_pos(1, 0)
         lcd.print("SENT" if ok else "FAIL")
         time.sleep(.5)
-    else:
-        change_state(RECEIVING)
 
 def send_backspace():
+    '''
+    handler for backspace key in SENDING
+
+    deletes character in message before the cursor
+    '''
     global send_msg, cursor_pos
     if cursor_pos > 0:
         send_msg = send_msg[:cursor_pos-1] + send_msg[cursor_pos:]
@@ -160,36 +167,68 @@ def send_backspace():
 
 
 def send_escape():
+    '''
+    handler for escape key in SENDING
+
+    clears current message
+    '''
     global send_msg, cursor_pos
     send_msg = ""
     cursor_pos = 0
 
 def send_up():
+    '''
+    handler for up key in SENDING
+    
+    no current functionality
+    '''
     pass
 
 def send_down():
+    '''
+    handler for down key in SENDING
+    
+    no current functionality
+    '''
     pass
 
 def send_left():
+    '''
+    handler for left key in SENDING
+    
+    moves cursor left
+    '''
     global cursor_pos
     cursor_pos = max(0, cursor_pos - 1)
 
 def send_right():
+    '''
+    handler for right key in SENDING
+    
+    moves cursor right
+    '''
     global cursor_pos
     cursor_pos = min(len(send_msg), cursor_pos + 1)
 
 def tab(): ###### CHANGES DEVICE STATE SEND OR RECEIVE#################
+    '''
+    handler for tab key in SENDING or RECEIVING
+    
+    changes device state
+    
+    outbox <-> inbox
+    '''
     next_state = not state
     change_state(next_state)
 
 
-############ SPECIAL KEY HANDLER
+############ SPECIAL KEY HANDLER DICT
 '''
 KEY: VALUE => M5 KB Special Key: Special Key Handler Function
 
 On index of special key, calls appropriate key handler function per device state
 '''
-SPECIAL = { #special key handler dict
+SPECIAL = {
     SENDING: {
         m5.Keyboard.ENTER: send_enter,
         m5.Keyboard.BACKSPACE: send_backspace,
@@ -206,8 +245,9 @@ SPECIAL = { #special key handler dict
     }
 }
 
-
+###########################################
 # ------------- INITS ------------------- #
+###########################################
 i2c = busio.I2C(scl=SCL, sda=SDA) #init I2C bus
 while not i2c.try_lock(): pass
 #check address list is valid
@@ -240,7 +280,10 @@ nrf.open_tx_pipe(ADDRESSES[1 - RADIO_ID])     # send to the other pager
 nrf.open_rx_pipe(1, ADDRESSES[RADIO_ID])      # listen on my own address
 nrf.listen = True                   # default to receive mode
 
+
+##########################################
 # ------------- LOOP ------------------- #
+##########################################
 while 1:
     msg = radio_receive() #poll message receive function
     if msg is not None:
